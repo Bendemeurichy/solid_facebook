@@ -55,7 +55,7 @@ import SupportIcon from './icons/IconSupport.vue'
     a visit.
   </WelcomeItem>
 
-  <WelcomeItem>
+<WelcomeItem>
     <template #icon>
       <CommunityIcon />
     </template>
