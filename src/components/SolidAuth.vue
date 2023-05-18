@@ -9,7 +9,7 @@
         <input type="submit" value="Login" />
       </form>
     </div>
-    <div v-else>
+    <div v-else class="centraldiv">
       <p style="display: inline-block; margin-right: 1em">
         Logged in as: {{ webid }}
       </p>
@@ -19,6 +19,11 @@
 </template>
 
 <style>
+.centraldiv {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 @media (min-width: 1024px) {
   .query {
     min-height: 100vh;

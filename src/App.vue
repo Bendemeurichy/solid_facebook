@@ -36,7 +36,7 @@
 </script>
 
 <template>
-  <div>
+  <div class="header">
     <header>
       <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
     </header>
@@ -44,12 +44,14 @@
       <div v-if="checkingLogin">
         <p>Loading Solid Session ...</p>
       </div>
-      <div v-else>
+      <div v-else >
         <SolidAuth :loggedIn="loggedIn" />
         <div v-if="loggedIn">
           <nav>
             <RouterLink to="/">Home</RouterLink>
             <RouterLink to="/query">Query</RouterLink>
+            <RouterLink to="/feed">My posts</RouterLink>
+
           </nav>
           <RouterView />
         </div>
@@ -114,6 +116,12 @@ nav a:first-of-type {
   .greetings {
     display: flex;
     justify-content: center;
+  }
+  .header {
+    display: flex;
+      flex-direction: column;
+    justify-content: center;
+    place-items: center;
   }
 
   nav {
