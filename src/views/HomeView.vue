@@ -523,7 +523,7 @@ async function checkNameExists() {
     display: grid;
     grid-template-columns: 1fr 1fr;
     width: 80%;
-    height: 80%;
+    height: 200px;
     overflow-y: scroll;
   }
 

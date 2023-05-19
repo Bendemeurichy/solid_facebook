@@ -28,9 +28,13 @@ let resourceURL = webId
 const engine = new QueryEngine();
 
 let posts = ref<Array<Metadata>>([]);
+let allposts = ref<Array<Metadata>>([]);
 let currentPost = ref<Metadata>({});
 let currentAuthor = ref<Contact>({});
 let currentTagged = ref<Array<Contact>>([]);
+let authorfilter = ref<Contact>({});
+let taggedfilter = ref<Array<string>>([]);
+let personlist = ref<Array<Contact>>([]);
 
 async function fetchMetadataFiles() {
   const metadataContainerUrl = `${resourceURL!.split('/profile')[0]}/private/images/metadata/`;
@@ -159,6 +163,52 @@ async function changeCurrentPost(post: Metadata){
   }
 };
 
+async function getContacts() {
+  const profileUrl = webId;
+
+  // Fetch the profile dataset
+  const profileDataset = await getSolidDataset(profileUrl, { fetch });
+
+  // Get all Things in the dataset
+  const allThings = getThingAll(profileDataset);
+
+  // Filter Things that have a foaf:knows property
+  const contacts = allThings.filter(thing => getUrl(thing, FOAF.knows));
+
+  // Create a list of contact objects with WebID and name
+  const contactPromises = contacts.map(async contact => {
+    const webId = getUrl(contact, FOAF.knows);
+    console.log("adding image with " + webId);
+    const img = await getContactProfilePicture(webId);
+    console.log("image added " + img);
+    return {
+      webId: webId,
+      image: img,
+      name: await getContactPublicName(webId),
+    };
+  });
+
+  // Wait for all promises to resolve and return the final result
+  return Promise.all(contactPromises);
+}
+
+async function filterAuthor() {
+  posts.value = allposts.value
+  if (authorfilter.value.file !== null) {
+    posts.value = posts.value.filter(post => post.author == authorfilter.value)
+  }
+}
+
+async function filterTagged() {
+  posts.value = allposts.value;
+  if (taggedfilter.value.length !== 0) {
+    posts.value = posts.value.filter(post => {
+      // Check if all of the tagged people are in the post's tagged array
+      return taggedfilter.value.every(tag => post.tagged.includes(tag));
+    });
+  }
+}
+
 async function deleteCurrentPost() {
   const metadataContainerUrl = `${resourceURL!.split('/profile')[0]}/private/images/metadata/`;
   const metadataFileUrl = currentPost.value.file.replace("/image/","/metadata/").replace(".jpg",".ttl");
@@ -182,7 +232,10 @@ async function deleteCurrentPost() {
 };
 
 onMounted(async () => {
-  posts.value = await fetchMetadataFiles();
+  personlist.value = await getContacts();
+  personlist.value.push({webId: webId,image: await getContactProfilePicture(webId),name: await getContactPublicName(webId) })
+  allposts.value = await fetchMetadataFiles();
+  posts.value = allposts.value
 });
 </script>
 
@@ -191,11 +244,40 @@ onMounted(async () => {
     <div class="addpost">
      <RouterLink to="/addPost"><button onclick="">Add new post</button></RouterLink>
     </div>
-    <div class="postfeed">
+
+      <h2>Filters:</h2>
+      <div class="filters">
+        <div class="filter">
+          <h3>Author:</h3>
+          <select v-model="authorfilter" @change="filterAuthor">
+            <option :value="null">All</option>
+            <option v-for="person in personlist" :key="person.name" :value="person.webId">
+              <tr class="contactElement">
+                <td class="contactField"><img :src="person.image" alt="no picture" class="contactPicture"/></td>
+                <td class="contactField">{{person.name===null? "no foaf:name defined on profile":person.name}}</td>
+              </tr>
+            </option>
+          </select>
+        </div>
+        <div class="filter">
+          <h3>Tagged:</h3>
+          <div class="checked">
+            <div v-for="person in personlist" :key="person.name">
+              <tr class="contactElement">
+                <td class="contactField"><input type="checkbox" :value="person.webId" v-model="taggedfilter" @change="filterTagged"></td>
+                <td class="contactField"><img :src="person.image" alt="no picture" class="contactPicture"/></td>
+                <td class="contactField">{{person.name===null? "no foaf:name defined on profile":person.name}}</td>
+              </tr>
+
+            </div>
+          </div>
+        </div>
+      </div>
       <div v-if="posts.length===0">
         <p>No posts found</p>
       </div>
       <div v-else class="verticalContainer postList">
+        <div class="postfeed">
         <div class="rowdiv">
           <div class="leftside">
             <div class="verticalcontainer">
@@ -231,7 +313,6 @@ onMounted(async () => {
               </tr>
               </div>
               <button @click="deleteCurrentPost">Delete post</button>
-
             </div>
           </div>
         </div>
@@ -243,17 +324,50 @@ onMounted(async () => {
 <style scoped>
 .rightside{
     align-content: start;
-  width: 100%;
+  width: 650px;
   height: fit-content;
   overflow: auto;
 }
-
 
 .leftside,
 .rightside {
     margin: 0;
     padding: 0;
     vertical-align: top;
+}
+.contactList{
+    width: 600px;
+    height: 200px;
+}
+
+.filters {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    width: 860px;
+}
+
+.filter {
+    display: flex;
+    flex-direction: column;
+}
+
+.checked {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 10px;
+    width: 600px;
+    height: 120px;
+    overflow-y: auto;
+    border-radius: 10px;
+    border: 1px solid #00bd7e;
+}
+
+.contactElement {
+    display: flex;
+    align-items: center;
+    width: 260px;
 }
 
 .rowdiv {
@@ -270,7 +384,7 @@ onMounted(async () => {
 }
 
 .detailPicture{
-    width: 100%;
+    width: 500px;
     height: auto;
     border-radius: 10px;
     border: 1px solid #00bd7e;

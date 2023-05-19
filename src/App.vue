@@ -53,7 +53,7 @@
             <RouterLink to="/feed">My posts</RouterLink>
 
           </nav>
-          <RouterView />
+          <RouterView class="view"/>
         </div>
       </div>
     </div>
@@ -70,6 +70,7 @@ header {
   display: block;
   margin: 0 auto 2rem;
 }
+
 
 nav {
   width: 100%;

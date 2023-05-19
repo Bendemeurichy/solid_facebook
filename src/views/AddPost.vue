@@ -324,11 +324,11 @@ onMounted(async () => {
  </div>
  <div class="tagged">
   <h2>Tagged people</h2>
-  <div v-if="contacts===[]">
+  <div v-if="authorlist===[]">
    <p>No contacts found</p>
   </div>
   <div v-else class="verticalContainer contactList">
-   <tr  v-for="contact in contacts" :key="contact.webId" class="contactElement">
+   <tr  v-for="contact in authorlist" :key="contact.webId" class="contactElement">
     <td class="contactField"><img :src="contact.image" alt="no picture" class="contactPicture"/></td>
     <td class="contactField">{{contact.name===null? "no foaf:name defined on profile":contact.name}}</td>
     <td class="contactField"><input type="checkbox" :id="contact.webId" :value="contact.webId" v-model="tagged"></td>
@@ -343,7 +343,7 @@ onMounted(async () => {
 <style scoped>
  .image {
   border-radius: 10px;
-  width: 50%;
+  width: 40%;
   height: auto;
  }
  .postimg {
