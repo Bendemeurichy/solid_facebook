@@ -10,7 +10,6 @@ import {
   getContainedResourceUrlAll, getFile,
   getSolidDataset,
   getStringNoLocale,
-  getThing,
   getThingAll,
   getUrl,
   getUrlAll
@@ -36,11 +35,11 @@ let authorfilter = ref<Contact>({});
 let taggedfilter = ref<Array<string>>([]);
 let personlist = ref<Array<Contact>>([]);
 
-async function fetchMetadataFiles() {
-  const metadataContainerUrl = `${resourceURL!.split('/profile')[0]}/private/images/metadata/`;
-  console.log("metadata container url "+metadataContainerUrl)
+async function fetchMetadataFiles(url:string) {
+  const resourceurl = url.replace(/\/image\//, "/metadata/");
+  console.log("metadata container url "+resourceurl)
   try {
-    const metadataContainerDataset = await getSolidDataset(metadataContainerUrl, { fetch });
+    const metadataContainerDataset = await getSolidDataset(resourceurl, { fetch });
     console.log("metadata container dataset "+metadataContainerDataset)
     // Get all metadata file URLs
     const metadataFileUrls = getContainedResourceUrlAll(metadataContainerDataset);
@@ -57,7 +56,7 @@ async function fetchMetadataFiles() {
         throw new Error(`No metadata found in ${metadataFileUrl}`);
       }
       const metadata = {
-        fetchedImage: await fetchPrivateImage(getUrl(metadataThing, "http://xmlns.com/foaf/0.1/img")),
+        fetchedImage: url.match("/private") ?await fetchPrivateImage(getUrl(metadataThing, "http://xmlns.com/foaf/0.1/img")):getUrl(metadataThing, "http://xmlns.com/foaf/0.1/img"),
         file: getUrl(metadataThing, "http://xmlns.com/foaf/0.1/img"),
         title: getStringNoLocale(metadataThing, "http://xmlns.com/foaf/0.1/title"),
         description: getStringNoLocale(metadataThing, "http://xmlns.com/foaf/0.1/depiction"),
@@ -209,9 +208,9 @@ async function filterTagged() {
   }
 }
 
-async function deleteCurrentPost() {
-  const metadataContainerUrl = `${resourceURL!.split('/profile')[0]}/private/images/metadata/`;
-  const metadataFileUrl = currentPost.value.file.replace("/image/","/metadata/").replace(".jpg",".ttl");
+async function deleteCurrentPost(url:string) {
+
+  const metadataFileUrl = currentPost.value.file.replace("/image/","/metadata/").replace(/.jpg$/,".ttl");
   console.log("metadata file url "+metadataFileUrl)
   try {
     // Delete the metadata file
@@ -221,7 +220,13 @@ async function deleteCurrentPost() {
     await deleteFile(currentPost.value.file, { fetch });
     console.log("image file deleted")
     // Update the list of metadata files
-    posts.value = await fetchMetadataFiles();
+    let metadataurl = `${resourceURL!.split('/profile')[0]}/private/images/metadata/`;
+    allposts.value = await fetchMetadataFiles(metadataurl);
+    metadataurl = `${resourceURL!.split('/profile')[0]}/public/images/metadata/`;
+    allposts.value.push(await fetchMetadataFiles(metadataurl))
+    posts.value = allposts.value
+    authorfilter.value={}
+    taggedfilter.value=[]
     console.log("metadata files updated")
     // Reset the current post
     currentPost.value = {};
@@ -234,7 +239,10 @@ async function deleteCurrentPost() {
 onMounted(async () => {
   personlist.value = await getContacts();
   personlist.value.push({webId: webId,image: await getContactProfilePicture(webId),name: await getContactPublicName(webId) })
-  allposts.value = await fetchMetadataFiles();
+  let url = `${resourceURL!.split('/profile')[0]}/private/images/metadata/`;
+  allposts.value = await fetchMetadataFiles(url);
+  url = `${resourceURL!.split('/profile')[0]}/public/images/metadata/`;
+  allposts.value.push(await fetchMetadataFiles(url))
   posts.value = allposts.value
 });
 </script>
@@ -244,42 +252,68 @@ onMounted(async () => {
     <div class="addpost">
      <RouterLink to="/addPost"><button onclick="">Add new post</button></RouterLink>
     </div>
-
-      <h2>Filters:</h2>
-      <div class="filters">
-        <div class="filter">
-          <h3>Author:</h3>
-          <select v-model="authorfilter" @change="filterAuthor">
-            <option :value="null">All</option>
-            <option v-for="person in personlist" :key="person.name" :value="person.webId">
-              <tr class="contactElement">
-                <td class="contactField"><img :src="person.image" alt="no picture" class="contactPicture"/></td>
-                <td class="contactField">{{person.name===null? "no foaf:name defined on profile":person.name}}</td>
-              </tr>
-            </option>
-          </select>
-        </div>
-        <div class="filter">
-          <h3>Tagged:</h3>
-          <div class="checked">
-            <div v-for="person in personlist" :key="person.name">
-              <tr class="contactElement">
-                <td class="contactField"><input type="checkbox" :value="person.webId" v-model="taggedfilter" @change="filterTagged"></td>
-                <td class="contactField"><img :src="person.image" alt="no picture" class="contactPicture"/></td>
-                <td class="contactField">{{person.name===null? "no foaf:name defined on profile":person.name}}</td>
-              </tr>
-
+      <div v-if="posts.length===0">
+        <h2>Filters:</h2>
+        <div class="filters">
+          <div class="filter">
+            <h3>Author:</h3>
+            <select v-model="authorfilter" @change="filterAuthor">
+              <option :value="null">All</option>
+              <option v-for="person in personlist" :key="person.name" :value="person.webId">
+                <tr class="contactElement">
+                  <td class="contactField"><img :src="person.image" alt="no picture" class="contactPicture"/></td>
+                  <td class="contactField">{{person.name===null? "no foaf:name defined on profile":person.name}}</td>
+                </tr>
+              </option>
+            </select>
+          </div>
+          <div class="filter">
+            <h3>Tagged:</h3>
+            <div class="checked">
+              <div v-for="person in personlist" :key="person.name">
+                <tr class="contactElement">
+                  <td class="contactField"><input type="checkbox" :value="person.webId" v-model="taggedfilter" @change="filterTagged"></td>
+                  <td class="contactField"><img :src="person.image" alt="no picture" class="contactPicture"/></td>
+                  <td class="contactField">{{person.name===null? "no foaf:name defined on profile":person.name}}</td>
+                </tr>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      <div v-if="posts.length===0">
         <p>No posts found</p>
       </div>
       <div v-else class="verticalContainer postList">
         <div class="postfeed">
         <div class="rowdiv">
           <div class="leftside">
+            <h2>Filters:</h2>
+            <div class="filters">
+              <div class="filter">
+                <h3>Author:</h3>
+                <select v-model="authorfilter" @change="filterAuthor">
+                  <option :value="null">All</option>
+                  <option v-for="person in personlist" :key="person.name" :value="person.webId">
+                    <tr class="contactElement">
+                      <td class="contactField"><img :src="person.image" alt="no picture" class="contactPicture"/></td>
+                      <td class="contactField">{{person.name===null? "no foaf:name defined on profile":person.name}}</td>
+                    </tr>
+                  </option>
+                </select>
+              </div>
+              <div class="filter">
+                <h3>Tagged:</h3>
+                <div class="checked">
+                  <div v-for="person in personlist" :key="person.name">
+                    <tr class="contactElement">
+                      <td class="contactField"><input type="checkbox" :value="person.webId" v-model="taggedfilter" @change="filterTagged"></td>
+                      <td class="contactField"><img :src="person.image" alt="no picture" class="contactPicture"/></td>
+                      <td class="contactField">{{person.name===null? "no foaf:name defined on profile":person.name}}</td>
+                    </tr>
+
+                  </div>
+                </div>
+              </div>
+            </div>
             <div class="verticalcontainer">
               <h1 class="feedHeader">Your Posts</h1>
               <tr v-for="post in posts" :key="post.title">
@@ -312,7 +346,7 @@ onMounted(async () => {
                 <td class="contactField">{{contact.name===null? "no foaf:name defined on profile":contact.name}}</td>
               </tr>
               </div>
-              <button @click="deleteCurrentPost">Delete post</button>
+              <button @click="deleteCurrentPost(currentPost.file)">Delete post</button>
             </div>
           </div>
         </div>
@@ -324,7 +358,7 @@ onMounted(async () => {
 <style scoped>
 .rightside{
     align-content: start;
-  width: 650px;
+  width: 600px;
   height: fit-content;
   overflow: auto;
 }

@@ -15,7 +15,14 @@ import {
   removeThing,
   setStringNoLocale,
   setThing,
-  setUrl, removeUrl, removeStringNoLocale
+  setUrl,
+  removeUrl,
+  removeStringNoLocale,
+  deleteFile,
+  setAgentResourceAccess,
+  createAclFromFallbackAcl,
+  getResourceAcl,
+  hasResourceAcl
 } from "@inrupt/solid-client";
 import { FOAF } from "@inrupt/vocab-common-rdf";
 
@@ -381,6 +388,7 @@ async function checkNameExists() {
   }
 
   onMounted(async () => {
+    //get contacts
     contacts.value= await getContacts();
     console.log("contacts: "+contacts.value.map((contact: any) => contact.name+" "+contact.webId+" "+contact.image))
     if(await checkNameExists()) {

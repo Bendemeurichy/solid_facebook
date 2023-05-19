@@ -1,20 +1,28 @@
 <script setup lang="ts">
 import router from "@/router";
-
-export type {Metadata};
 import { onMounted, ref } from "vue";
 import type { Contact } from "@/views/HomeView.vue";
 import { FOAF } from "@inrupt/vocab-common-rdf";
 import {
- addStringNoLocale,
  addUrl,
  createSolidDataset,
- createThing, getSolidDataset, getSourceUrl, getThingAll, getUrl,
- overwriteFile, saveSolidDatasetAt, setStringNoLocale,
- setThing, setUrl
+ createThing,
+ getSolidDataset,
+ getSolidDatasetWithAcl,
+ getSourceUrl,
+ getThing,
+ getThingAll,
+ getUrl,
+ overwriteFile,
+ saveSolidDatasetAt,
+ setStringNoLocale,
+ setThing,
+ setUrl
 } from "@inrupt/solid-client";
 import { getDefaultSession } from "@inrupt/solid-client-authn-browser";
 import { QueryEngine } from "@comunica/query-sparql";
+
+export type {Metadata};
 
 const postTitle = ref("");
 const postDescription = ref("");
@@ -30,6 +38,7 @@ const session = getDefaultSession()
 const webId = session.info.webId;
 const fetch = session.fetch
 const engine = new QueryEngine()
+const shared = ref<boolean>(false)
 
 function handleFileChange(event:Event) {
  const target = event.target as HTMLInputElement;
@@ -258,11 +267,18 @@ async function uploadImageToPod(imageFile:File, targetUrl:string) {
 }
 
 async function handleFiles() {
-
- // Set the target URLs for the image and metadata files
- const imageTargetUrl = `${webId.split('/profile')[0]}/private/images/image/${selectedFile.value!.name}.jpg`.replace(/\s/g, '');
- const metadataTargetUrl = `${webId.split('/profile')[0]}/private/images/metadata/${selectedFile.value!.name}.ttl`.replace(/\s/g, '');
-
+ console.log(shared.value)
+ let imageTargetUrl=""
+ let metadataTargetUrl=""
+ if (!shared.value) {
+  // Set the target URLs for the image and metadata files
+  imageTargetUrl= `${webId.split('/profile')[0]}/private/images/image/${selectedFile.value!.name}.jpg`.replace(/\s/g, '');
+  metadataTargetUrl= `${webId.split('/profile')[0]}/private/images/metadata/${selectedFile.value!.name}.ttl`.replace(/\s/g, '');
+ } else {
+  // Set the target URLs for the image and metadata files
+  imageTargetUrl = `${webId.split('/profile')[0]}/public/images/image/${selectedFile.value!.name}.jpg`.replace(/\s/g, '');
+  metadataTargetUrl = `${webId.split('/profile')[0]}/public/images/metadata/${selectedFile.value!.name}.ttl`.replace(/\s/g, '');
+ }
 
 
  // Set the metadata
@@ -280,14 +296,64 @@ async function handleFiles() {
  // Upload the image and metadata files
  await uploadImageToPod(imageFile, imageTargetUrl);
  await uploadMetadata(metadataTargetUrl, metadata,imageTargetUrl);
-
+ if(!shared.value){
+  await grantFileAccess(imageTargetUrl,tagged.value)
+  await grantFileAccess(metadataTargetUrl,tagged.value)
+ }
  console.log('Image and metadata uploaded successfully.');
  await router.replace('/feed')
 }
 
+function getAclUrl(resourceUrl:string) {
+ return resourceUrl.endsWith('.acl') ? resourceUrl : `${resourceUrl}.acl`;
+}
+async function grantFileAccess(fileUrl:string, webIds:string[]) {
+  // Fetch the ACL file or create it if it doesn't exist
+  const aclUrl = getAclUrl(fileUrl);
+  let aclDataset;
+  try {
+   const datasetWithAcl = await getSolidDatasetWithAcl(aclUrl, { fetch });
+   aclDataset = datasetWithAcl;
+  } catch (error) {
+   if (error.statusCode === 404) {
+    // Create the ACL file
+    const emptyAclDataset = createSolidDataset();
+    aclDataset = await saveSolidDatasetAt(aclUrl, emptyAclDataset, { fetch });
+   } else {
+    throw error;
+   }
+  }
+
+  // Add read permissions for the list of WebIDs
+  let updatedAclDataset = aclDataset;
+  webIds.forEach((webId) => {
+   const agentMatcherUrl = `${aclUrl}#${encodeURIComponent(webId)}-matcher`;
+   const existingMatcherThing = getThing(updatedAclDataset, agentMatcherUrl);
+   const updatedMatcherThing = setUrl(existingMatcherThing || createThing({ url: agentMatcherUrl }), 'http://www.w3.org/ns/auth/acl#agent', webId);
+   updatedAclDataset = setThing(updatedAclDataset, updatedMatcherThing);
+  });
+
+  // Add read and write permissions for the owner of the Pod
+  const ownerWebId = session.webId;
+  const ownerMatcherUrl = `${aclUrl}#${encodeURIComponent(ownerWebId)}-owner-matcher`;
+  const existingOwnerMatcherThing = getThing(updatedAclDataset, ownerMatcherUrl);
+  let updatedOwnerMatcherThing = setUrl(
+    existingOwnerMatcherThing || createThing({ url: ownerMatcherUrl }),
+    'http://www.w3.org/ns/auth/acl#agent',
+    ownerWebId
+  );
+  updatedOwnerMatcherThing = addUrl(updatedOwnerMatcherThing, 'http://www.w3.org/ns/auth/acl#mode', 'http://www.w3.org/ns/auth/acl#Read');
+  updatedOwnerMatcherThing = addUrl(updatedOwnerMatcherThing, 'http://www.w3.org/ns/auth/acl#mode', 'http://www.w3.org/ns/auth/acl#Write');
+  updatedAclDataset = setThing(updatedAclDataset, updatedOwnerMatcherThing);
+
+  // Save the updated ACL file
+  await saveSolidDatasetAt(aclUrl, updatedAclDataset, { fetch });
+ }
 
 
-onMounted(async () => {
+
+
+ onMounted(async () => {
  contacts.value = await getContacts();
  authorlist.value  = [... contacts.value];
  authorlist.value.push({webId:webId, name: await getName(), image: await getProfilePicture()});
@@ -333,6 +399,10 @@ onMounted(async () => {
     <td class="contactField">{{contact.name===null? "no foaf:name defined on profile":contact.name}}</td>
     <td class="contactField"><input type="checkbox" :id="contact.webId" :value="contact.webId" v-model="tagged"></td>
    </tr>
+  </div>
+  <div>
+<input type="checkbox" id="public" value="public" v-model="shared">
+   <label for="public">Public</label>
   </div>
   <input type="submit" value="Post">
  </div>
