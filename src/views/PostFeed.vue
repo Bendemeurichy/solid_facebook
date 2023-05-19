@@ -147,14 +147,18 @@ async function fetchPrivateImage(imageUrl:string) {
   }
 }
 
-
 async function changeCurrentPost(post: Metadata){
   currentPost.value = post;
+  currentTagged.value = [];
   currentAuthor.value = {webId: post.author,image: await getContactProfilePicture(post.author),name: await getContactPublicName(post.author) }
   console.log("current post "+currentPost.value.title)
   for (const tagged of post.tagged) {
     currentTagged.value.push({webId: tagged,image: await getContactProfilePicture(tagged),name: await getContactPublicName(tagged) })
   }
+}
+
+async function deleteCurrentPost() {
+
 }
 
 onMounted(async () => {
@@ -168,7 +172,6 @@ onMounted(async () => {
      <RouterLink to="/addPost"><button onclick="">Add new post</button></RouterLink>
     </div>
     <div class="postfeed">
-      <h1 class="feedHeader">Your Posts</h1>
       <div v-if="posts.length===0">
         <p>You currently have no posts</p>
       </div>
@@ -176,6 +179,7 @@ onMounted(async () => {
         <div class="rowdiv">
           <div class="leftside">
             <div class="verticalcontainer">
+              <h1 class="feedHeader">Your Posts</h1>
               <tr v-for="post in posts" :key="post.title">
                 <td class="contactField" @click="changeCurrentPost(post)"><img :src="post.file" alt="no picture" class="postPicture"/></td>
               </tr>
@@ -187,8 +191,8 @@ onMounted(async () => {
               <p>Click on a post to view details</p>
             </div>
             <div v-else>
+              <h1 class="postDetails">{{currentPost.title}}</h1>
               <img :src="currentPost.file" alt="no picture" class="detailPicture">
-              <h2 class="postDetails">Title: {{currentPost.title}}</h2>
               <h2 class="postDetails">Description</h2>
               <p>{{currentPost.description}}</p>
               <h2 class="postDetails">Author</h2>
@@ -201,6 +205,7 @@ onMounted(async () => {
                 <td class="contactField"><img :src="contact.image" alt="no picture" class="contactPicture"/></td>
                 <td class="contactField">{{contact.name===null? "no foaf:name defined on profile":contact.name}}</td>
               </tr>
+              <button @onclick="deleteCurrentPost">Delete post</button>
             </div>
           </div>
         </div>
@@ -217,16 +222,31 @@ onMounted(async () => {
   overflow: auto;
 }
 
+.leftside,
+.rightside {
+    margin: 0;
+    padding: 0;
+    vertical-align: top;
+}
+
+.rowdiv {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-content: center;
+}
+
 .postPicture{
     width: 50%;
     height: auto;
     border-radius: 10px;
+    border: 1px solid #00bd7e;
 }
 
 .detailPicture{
     width: 100%;
     height: auto;
     border-radius: 10px;
+    border: 1px solid #00bd7e;
 }
 
 </style>
