@@ -28,6 +28,8 @@ const engine = new QueryEngine();
 
 let posts = ref<Array<Metadata>>([]);
 let currentPost = ref<Metadata>({});
+let currentAuthor = ref<Contact>({});
+let currentTagged = ref<Array<Contact>>([]);
 
 async function fetchMetadataFiles() {
   const metadataContainerUrl = `${resourceURL!.split('/profile')[0]}/private/images/metadata/`;
@@ -69,6 +71,67 @@ async function fetchMetadataFiles() {
   }
 }
 
+//get contact profile picture
+async function getContactProfilePicture(profileUrl:string) {
+  // Initialize the Comunica engine
+  // Construct a SPARQL query to fetch the profile picture URL
+  const query = `
+    PREFIX foaf: <${FOAF.NAMESPACE}>
+    SELECT ?img
+    WHERE {
+      ?person foaf:img ?img .
+    }
+    LIMIT 1
+  `;
+
+  // Execute the query using Comunica
+  const bindingsStream = await engine.queryBindings(query, {
+    sources: [profileUrl],
+  });
+
+  // Get the profile picture URL from the query result
+  let profilePictureUrl: unknown = null;
+
+  return new Promise((resolve, reject) => {
+    bindingsStream.on('data', (binding) => {
+      profilePictureUrl = binding.get('img').value;
+    });
+    bindingsStream.on('end', () => resolve(profilePictureUrl));
+    bindingsStream.on('error', (error) => reject(error));
+  });
+}
+
+//get contact name
+async function getContactPublicName(profileUrl: string) {
+  // Initialize the Comunica engine
+  // Construct a SPARQL query to fetch the public name
+  const query = `
+    PREFIX foaf: <${FOAF.NAMESPACE}>
+    SELECT ?name
+    WHERE {
+      ?person foaf:name ?name .
+    }
+    LIMIT 1
+  `;
+
+  // Execute the query using Comunica
+  const bindingsStream = await engine.queryBindings(query, {
+    sources: [profileUrl],
+  });
+
+  // Get the public name from the query result
+  let publicName: unknown = null;
+
+  return new Promise((resolve, reject) => {
+    bindingsStream.on('data', (binding) => {
+      publicName = binding.get('name').value;
+    });
+    bindingsStream.on('end', () => resolve(publicName));
+    bindingsStream.on('error', (error) => reject(error));
+  });
+}
+
+
 async function fetchPrivateImage(imageUrl:string) {
   try {
     // Fetch the image file from the Solid POD
@@ -87,6 +150,11 @@ async function fetchPrivateImage(imageUrl:string) {
 
 async function changeCurrentPost(post: Metadata){
   currentPost.value = post;
+  currentAuthor.value = {webId: post.author,image: await getContactProfilePicture(post.author),name: await getContactPublicName(post.author) }
+  console.log("current post "+currentPost.value.title)
+  for (const tagged of post.tagged) {
+    currentTagged.value.push({webId: tagged,image: await getContactProfilePicture(tagged),name: await getContactPublicName(tagged) })
+  }
 }
 
 onMounted(async () => {
@@ -121,8 +189,18 @@ onMounted(async () => {
             <div v-else>
               <img :src="currentPost.file" alt="no picture" class="detailPicture">
               <h2 class="postDetails">Title: {{currentPost.title}}</h2>
-              <h2 class="postDetails">Description: </h2>
+              <h2 class="postDetails">Description</h2>
               <p>{{currentPost.description}}</p>
+              <h2 class="postDetails">Author</h2>
+              <tr class="contactElement">
+                <td class="contactField"><img :src="currentAuthor.image" alt="no picture" class="contactPicture"/></td>
+                <td class="contactField">{{currentAuthor.name===null? "no foaf:name defined on profile":currentAuthor.name}}</td>
+              </tr>
+              <h2 class="postDetails">Tagged</h2>
+              <tr  v-for="contact in currentTagged" :key="contact.webId" class="contactElement">
+                <td class="contactField"><img :src="contact.image" alt="no picture" class="contactPicture"/></td>
+                <td class="contactField">{{contact.name===null? "no foaf:name defined on profile":contact.name}}</td>
+              </tr>
             </div>
           </div>
         </div>
@@ -132,6 +210,12 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.rightside{
+    align-content: start;
+  width: 50%;
+  height: 100%;
+  overflow: auto;
+}
 
 .postPicture{
     width: 50%;
