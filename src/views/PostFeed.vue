@@ -221,11 +221,17 @@ onMounted(async () => {
                 <td class="contactField">{{currentAuthor.name===null? "no foaf:name defined on profile":currentAuthor.name}}</td>
               </tr>
               <h2 class="postDetails">Tagged</h2>
+              <div v-if="currentTagged.length===0">
+                <p>No contacts tagged</p>
+              </div>
+              <div class="contactList" v-else>
               <tr  v-for="contact in currentTagged" :key="contact.webId" class="contactElement">
                 <td class="contactField"><img :src="contact.image" alt="no picture" class="contactPicture"/></td>
                 <td class="contactField">{{contact.name===null? "no foaf:name defined on profile":contact.name}}</td>
               </tr>
+              </div>
               <button @click="deleteCurrentPost">Delete post</button>
+
             </div>
           </div>
         </div>
@@ -237,10 +243,11 @@ onMounted(async () => {
 <style scoped>
 .rightside{
     align-content: start;
-  width: 50%;
-  height: 100%;
+  width: 100%;
+  height: fit-content;
   overflow: auto;
 }
+
 
 .leftside,
 .rightside {

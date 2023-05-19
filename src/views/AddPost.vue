@@ -352,6 +352,7 @@ onMounted(async () => {
   align-items: start;
  }
 
+
  input {
   border-radius: 20px;
   border: 1px solid #00bd7e;
