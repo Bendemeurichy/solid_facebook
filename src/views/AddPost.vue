@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import router from "@/router";
+
 export type {Metadata};
 import { onMounted, ref } from "vue";
 import type { Contact } from "@/views/HomeView.vue";
@@ -280,6 +282,7 @@ async function handleFiles() {
  await uploadMetadata(metadataTargetUrl, metadata,imageTargetUrl);
 
  console.log('Image and metadata uploaded successfully.');
+ await router.replace('/feed')
 }
 
 
