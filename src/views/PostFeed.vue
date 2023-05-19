@@ -6,6 +6,7 @@ import { getDefaultSession } from "@inrupt/solid-client-authn-browser";
 import type * as RDF from "@rdfjs/types";
 import { QueryEngine } from "@comunica/query-sparql";
 import {
+  deleteFile,
   getContainedResourceUrlAll, getFile,
   getSolidDataset,
   getStringNoLocale,
@@ -52,7 +53,8 @@ async function fetchMetadataFiles() {
         throw new Error(`No metadata found in ${metadataFileUrl}`);
       }
       const metadata = {
-        file: await fetchPrivateImage(getUrl(metadataThing, "http://xmlns.com/foaf/0.1/img")),
+        fetchedImage: await fetchPrivateImage(getUrl(metadataThing, "http://xmlns.com/foaf/0.1/img")),
+        file: getUrl(metadataThing, "http://xmlns.com/foaf/0.1/img"),
         title: getStringNoLocale(metadataThing, "http://xmlns.com/foaf/0.1/title"),
         description: getStringNoLocale(metadataThing, "http://xmlns.com/foaf/0.1/depiction"),
         tagged: getUrlAll(metadataThing, "http://xmlns.com/foaf/0.1/depicts"),
@@ -155,15 +157,33 @@ async function changeCurrentPost(post: Metadata){
   for (const tagged of post.tagged) {
     currentTagged.value.push({webId: tagged,image: await getContactProfilePicture(tagged),name: await getContactPublicName(tagged) })
   }
-}
+};
 
 async function deleteCurrentPost() {
-
-}
+  const metadataContainerUrl = `${resourceURL!.split('/profile')[0]}/private/images/metadata/`;
+  const metadataFileUrl = currentPost.value.file.replace("/image/","/metadata/").replace(".jpg",".ttl");
+  console.log("metadata file url "+metadataFileUrl)
+  try {
+    // Delete the metadata file
+    await deleteFile(metadataFileUrl, { fetch });
+    console.log("metadata file deleted")
+    // Delete the image file
+    await deleteFile(currentPost.value.file, { fetch });
+    console.log("image file deleted")
+    // Update the list of metadata files
+    posts.value = await fetchMetadataFiles();
+    console.log("metadata files updated")
+    // Reset the current post
+    currentPost.value = {};
+    console.log("current post reset")
+  } catch (error) {
+    console.error("Error deleting metadata file:", error);
+  }
+};
 
 onMounted(async () => {
   posts.value = await fetchMetadataFiles();
-})
+});
 </script>
 
 <template>
@@ -173,7 +193,7 @@ onMounted(async () => {
     </div>
     <div class="postfeed">
       <div v-if="posts.length===0">
-        <p>You currently have no posts</p>
+        <p>No posts found</p>
       </div>
       <div v-else class="verticalContainer postList">
         <div class="rowdiv">
@@ -181,7 +201,7 @@ onMounted(async () => {
             <div class="verticalcontainer">
               <h1 class="feedHeader">Your Posts</h1>
               <tr v-for="post in posts" :key="post.title">
-                <td class="contactField" @click="changeCurrentPost(post)"><img :src="post.file" alt="no picture" class="postPicture"/></td>
+                <td class="contactField" @click="changeCurrentPost(post)"><img :src="post.fetchedImage" alt="no picture" class="postPicture"/></td>
               </tr>
             </div>
           </div>
@@ -192,7 +212,7 @@ onMounted(async () => {
             </div>
             <div v-else>
               <h1 class="postDetails">{{currentPost.title}}</h1>
-              <img :src="currentPost.file" alt="no picture" class="detailPicture">
+              <img :src="currentPost.fetchedImage" alt="no picture" class="detailPicture">
               <h2 class="postDetails">Description</h2>
               <p>{{currentPost.description}}</p>
               <h2 class="postDetails">Author</h2>
@@ -205,7 +225,7 @@ onMounted(async () => {
                 <td class="contactField"><img :src="contact.image" alt="no picture" class="contactPicture"/></td>
                 <td class="contactField">{{contact.name===null? "no foaf:name defined on profile":contact.name}}</td>
               </tr>
-              <button @onclick="deleteCurrentPost">Delete post</button>
+              <button @click="deleteCurrentPost">Delete post</button>
             </div>
           </div>
         </div>

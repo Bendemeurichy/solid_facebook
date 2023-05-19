@@ -194,6 +194,7 @@ async function getProfilePicture() {
 };
 
 type Metadata = {
+ fetchedImage:string
   file: string,
  title: string,
  description: string,
